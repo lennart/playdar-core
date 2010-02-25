@@ -6,6 +6,7 @@
 -module(playdar_web).
 -export([start/1, stop/0, loop/2, wsloop/1, render/3]).
 -include("playdar.hrl").
+-include_lib("xmerl/include/xmerl.hrl").
 
 %% External API
 
@@ -101,7 +102,8 @@ loop1(Req, DocRoot) ->
                                        {"receiverurl", proplists:get_value("receiverurl",Qs,"")},
                                        {"formtoken", Ftok},
                                        {"website", proplists:get_value("website", Qs,"")},
-                                       {"name", proplists:get_value("name", Qs, "")}
+                                       {"name", proplists:get_value("name", Qs, "")},
+                                       {"type", proplists:get_value("type", Qs, "")}
                                       ],
                             render(Req, DocRoot ++ "/auth.html", [{formvars, FormVars}]);
 
@@ -125,7 +127,8 @@ loop1(Req, DocRoot) ->
                     % create the entry in the auth db:
                     AuthCode = playdar_utils:uuid_gen(),
                     playdar_auth:create(AuthCode, [ {website, proplists:get_value("website",Qs, "")},
-                                            {name, proplists:get_value("name",Qs, "")}
+                                            {name, proplists:get_value("name",Qs, "")},
+                                            {type, proplists:get_value("type",Qs, "")}
                                           ]),
                     case proplists:get_value("receiverurl",Qs, "") of
                         "" ->
@@ -199,15 +202,15 @@ loop1(Req, DocRoot) ->
         "static/" ++ StaticFile ->
             Req:serve_file("static/" ++ StaticFile, DocRoot);
 
-		"crossdomain.xml" ->
-			% crossdomain support is on by default, but can be disabled in config:
-			case ?CONFVAL(crossdomain, true) of
-				true ->
-					Req:serve_file("crossdomain.xml", DocRoot);
-				false ->
-					Req:not_found()
-			end;
-		
+        "crossdomain.xml" ->
+            % crossdomain support is on by default, but can be disabled in config:
+            case ?CONFVAL(crossdomain, true) of
+                true ->
+                    Req:ok({"application/xml",[], build_crossdomain_xml()});
+                false ->
+                    Req:not_found()
+            end;
+
         % hand off dynamically:
         _ -> 
             case playdar_http_registry:get_handler(Req:get(path)) of
@@ -286,6 +289,27 @@ stream_result_body(Req, Resp, Ref) ->
             timeout
     end.
     
+build_crossdomain_xml() ->
+    AllowedAccessFrom = [{'allow-access-from', 
+        [{'domain', extract_domain_from_url(Website)}],[]} || {_UUID,
+        [{website,Website},
+          {name,_Name},
+          {type, Type}]} <- playdar_auth:all(), Type =:= "flash"],
+    SiteControl = {'site-control',
+      [{'permitted-cross-domain-policies',"master-only"}],
+      []},
+    xmerl:export_simple([
+        {'cross-domain-policy',[SiteControl|AllowedAccessFrom]
+        }],
+      xmerl_xml,
+      [{prolog,
+          ["<?xml version=\"1.0\"?><!DOCTYPE cross-domain-policy SYSTEM \"http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd\">"]}]).
+
+extract_domain_from_url(Url) ->
+    {_Proto, Host, _Path, _Query, _Fragment} = mochiweb_util:urlsplit(Url),
+    % split host by colon and get the first part (this might break on URLs of 
+    % the form user:password@host:port
+    lists:last(lists:reverse(string:tokens(Host, ":"))).
 
 get_option(Option, Options) -> get_option(Option, Options, undefined).
 get_option(Option, Options, Def) ->
