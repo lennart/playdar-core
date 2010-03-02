@@ -1,0 +1,3 @@
+[submodule "deps/mochixpath"]
+	path = deps/mochixpath
+	url = git://github.com/JacobVorreuter/mochixpath.git

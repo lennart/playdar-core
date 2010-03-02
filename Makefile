@@ -22,8 +22,14 @@ ebin/%.beam: %.erl | ebin
 ######################################################################### deps
 ERLYDTL_D = deps/erlydtl/src/erlydtl
 MOCHIWEB_D = deps/mochiweb/src
-vpath %.erl $(MOCHIWEB_D) $(ERLYDTL_D)
+MOCHIXPATH_D = deps/mochixpath/src
+vpath %.erl $(MOCHIWEB_D) $(ERLYDTL_D) $(MOCHIXPATH_D)
 
+ebin/mochixpath.app.in:
+	sh $(MOCHIXPATH_D)/../ebin/mochixpath.app.in 0.1
+
+ebin/mochixpath.app: ebin/mochixpath.app.in
+	
 $(ERLYDTL_D)/erlydtl_parser.erl: $(ERLYDTL_D)/erlydtl_parser.yrl
 	erlc -o $(ERLYDTL_D) $<
 ebin/erlydtl_compiler.beam: ebin/erlydtl_parser.beam
@@ -72,7 +78,7 @@ $(FSWATCHER): $(FSWATCHER).c
 endif
 
 ##################################################################### main bit
-all: $(BEAM) ebin/playdar.app ebin/mochiweb.app ebin/erlydtl.app
+all: $(BEAM) ebin/playdar.app ebin/mochiweb.app ebin/erlydtl.app ebin/mochixpath.app
 
 scanner: $(TAGLIB_JSON_READER) $(FSWATCHER)
 
@@ -80,7 +86,7 @@ clean:
 	rm -rf ebin $(EBIN)
 	rm -f $(ERLYDTL_PARSER) include/default_config.hrl .default_config.hrl.escript
 
-$(BEAM): include/playdar.hrl $(call erl2beam, $(MOCHIWEB_D) $(ERLYDTL_D))
+$(BEAM): include/playdar.hrl $(call erl2beam, $(MOCHIWEB_D) $(ERLYDTL_D) $(MOCHIXPATH_D))
 
 ebin:
 	mkdir ebin
